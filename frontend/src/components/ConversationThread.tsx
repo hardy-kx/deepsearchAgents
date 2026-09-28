@@ -31,6 +31,7 @@ export interface ChatTurn {
 
 interface ConversationThreadProps {
   onUseExample: (prompt: string) => void;
+  threadId: string;
   turns: ChatTurn[];
 }
 
@@ -227,7 +228,7 @@ function ThinkingTimeline({ events }: { events: MonitorMessage[] }) {
   );
 }
 
-function ArtifactShelf({ files }: { files: OutputFile[] }) {
+function ArtifactShelf({ files, threadId }: { files: OutputFile[]; threadId: string }) {
   if (files.length === 0) {
     return (
       <div className="artifact-empty">
@@ -252,7 +253,7 @@ function ArtifactShelf({ files }: { files: OutputFile[] }) {
             <Button
               aria-label={`下载 ${file.name}`}
               className="artifact-download"
-              href={getDownloadUrl(file.path)}
+              href={getDownloadUrl(threadId, file.path)}
               icon={<DownloadOutlined />}
               shape="circle"
             />
@@ -295,8 +296,11 @@ function AssistantMessage({
   files,
   isRunning,
   result,
+  threadId,
   timestamp,
-}: Pick<ChatTurn, "events" | "files" | "isRunning" | "result" | "timestamp">) {
+}: Pick<ChatTurn, "events" | "files" | "isRunning" | "result" | "timestamp"> & {
+  threadId: string;
+}) {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -365,7 +369,7 @@ function AssistantMessage({
             </span>
             <strong>{files.length}</strong>
           </summary>
-          <ArtifactShelf files={files} />
+          <ArtifactShelf files={files} threadId={threadId} />
         </details>
       </div>
     </article>
@@ -374,6 +378,7 @@ function AssistantMessage({
 
 export function ConversationThread({
   onUseExample,
+  threadId,
   turns,
 }: ConversationThreadProps) {
   if (turns.length === 0) {
@@ -430,6 +435,7 @@ export function ConversationThread({
             files={turn.files}
             isRunning={turn.isRunning}
             result={turn.result}
+            threadId={threadId}
             timestamp={turn.timestamp}
           />
         </div>

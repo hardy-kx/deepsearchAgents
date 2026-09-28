@@ -230,6 +230,7 @@ export default function App() {
         <section className="chat-stream-panel" ref={streamRef}>
           <ConversationThread
             onUseExample={setQuery}
+            threadId={session.threadId}
             turns={turns}
           />
         </section>

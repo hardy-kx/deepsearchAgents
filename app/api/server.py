@@ -177,29 +177,61 @@ async def upload_files(files: List[UploadFile] = File(...), thread_id: str = For
     return {"status": "uploaded", "files": saved_files}
 
 
+def _resolve_session_dir(thread_id: str) -> Path:
+    """
+    根据 thread_id 解析会话输出目录，并拒绝路径穿越。
+
+    前端只传会话 ID，由后端拼出 output/session_{thread_id}，
+    避免项目搬家后绝对路径失效，也降低越权访问风险。
+    """
+    if (
+        not thread_id
+        or thread_id != Path(thread_id).name
+        or "/" in thread_id
+        or "\\" in thread_id
+    ):
+        raise ValueError("无效的 thread_id")
+
+    session_path = (output_dir / f"session_{thread_id}").resolve()
+    if not session_path.is_relative_to(output_dir.resolve()):
+        raise ValueError("无效的 thread_id")
+    return session_path
+
+
+def _resolve_session_file(thread_id: str, relative_path: str) -> Path:
+    """把会话内相对路径解析为受控的绝对文件路径。"""
+    session_path = _resolve_session_dir(thread_id)
+    rel = Path(relative_path)
+    if not relative_path or rel.is_absolute() or ".." in rel.parts:
+        raise ValueError("无效的文件路径")
+
+    abs_path = (session_path / rel).resolve()
+    if not abs_path.is_relative_to(session_path):
+        raise ValueError("拒绝访问: 只能访问当前会话输出目录下的文件")
+    return abs_path
+
+
 @app.get("/api/download")
-async def download_file(path: str):
+async def download_file(thread_id: str, path: str):
     """
     文件下载接口 (File Download)。
 
     目标：
-    1. 根据绝对路径下载文件。
-    2. 严格的安全检查，防止越权访问。
+    1. 按 thread_id + 会话内相对路径下载文件。
+    2. 严格限制在对应 session 输出目录内，防止越权访问。
 
     Args:
-        path (str): 文件的绝对路径 (通常从 list_files 接口获取)。
+        thread_id (str): 会话 ID。
+        path (str): 相对于 output/session_{thread_id} 的文件路径。
     """
     try:
-        # resolve 后再做 is_relative_to，防止 `../` 之类的路径穿越到 output 之外
-        abs_path = Path(path).resolve()
-        output_abs = output_dir.resolve()
-
-        if not abs_path.is_relative_to(output_abs):
-            return {"error": "拒绝访问: 只能下载输出目录下的文件"}
+        abs_path = _resolve_session_file(thread_id, path)
+    except ValueError as e:
+        return {"error": str(e)}
     except Exception:
         return {"error": "无效的路径参数"}
 
-    if not abs_path.exists():
+    if not abs_path.exists() or not abs_path.is_file():
         return {"error": "文件不存在"}
 
     # FileResponse 会以流式响应返回文件内容，并让浏览器使用原文件名下载
@@ -207,39 +239,37 @@ async def download_file(path: str):
 
 
 @app.get("/api/files")
-async def list_files(path: str):
+async def list_files(thread_id: str):
     """
     文件列表查询接口 (File Explorer)。
 
     目标：
-    1. 列出指定目录下的所有生成文件。
-    2. 提供文件元数据（大小、修改时间、下载所需路径）。
-    3. 严格的安全检查，防止路径遍历攻击。
+    1. 按 thread_id 列出对应会话输出目录下的生成文件。
+    2. 返回会话内相对路径，供下载接口使用。
+    3. 严格限制在 output/session_{thread_id} 内。
 
     Args:
-        path (str): 目标目录的绝对路径 (必须在 output 目录下)。
+        thread_id (str): 会话 ID。
     """
-    print(f"[DEBUG] 请求文件列表: {path}")
+    print(f"[DEBUG] 请求文件列表: thread_id={thread_id}")
+    relative_session = f"output/session_{thread_id}"
 
     try:
-        # 和下载接口保持同一条安全边界：前端只能查看 output 目录内部内容
-        abs_path = Path(path).resolve()
-        output_abs = output_dir.resolve()
-
-        if not abs_path.is_relative_to(output_abs):
-            print(f"[ERROR] 拒绝访问: {abs_path} 不在 {output_abs} 目录下")
-            return {"error": "拒绝访问: 只能访问输出目录下的文件"}
-
+        abs_path = _resolve_session_dir(thread_id)
+    except ValueError as e:
+        print(f"[ERROR] thread_id 无效: {e}")
+        return {"error": str(e)}
     except Exception as e:
         print(f"[ERROR] 路径解析失败: {e}")
         return {"error": f"路径无效: {e}"}
 
+    # 任务尚未创建工作目录时返回空列表，避免前端轮询刷错误
     if not abs_path.exists():
-        return {"error": "目录不存在"}
+        return {"files": [], "session_path": relative_session}
 
     files = []
     try:
-        # 递归返回文件元数据，前端据此渲染文件列表并发起下载请求
+        # 递归返回文件元数据；path 使用会话内相对路径，不暴露本机绝对路径
         for file_path in abs_path.rglob("*"):
             if file_path.is_file():
                 stat = file_path.stat()
@@ -247,7 +277,7 @@ async def list_files(path: str):
                     {
                         "name": file_path.name,
                         "type": "file",
-                        "path": str(file_path),
+                        "path": str(file_path.relative_to(abs_path)).replace("\\", "/"),
                         "size": stat.st_size,
                         "mtime": stat.st_mtime,
                     }
@@ -260,7 +290,7 @@ async def list_files(path: str):
     # 最新生成的文件排在前面，方便用户优先看到本次任务产物
     files.sort(key=lambda x: x.get("mtime", 0), reverse=True)
     print(f"[DEBUG] 找到 {len(files)} 个文件")
-    return {"files": files}
+    return {"files": files, "session_path": relative_session}
 
 
 @app.websocket("/ws/{thread_id}")

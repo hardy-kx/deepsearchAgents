@@ -62,16 +62,19 @@ export function useDeepAgentSession() {
   }, []);
 
   const refreshFiles = useCallback(async () => {
-    if (!sessionPath) {
+    if (!threadId) {
       return;
     }
 
-    const response = await listSessionFiles(sessionPath);
+    const response = await listSessionFiles(threadId);
     if (response.error) {
       throw new Error(response.error);
     }
     setFiles(response.files || []);
-  }, [sessionPath]);
+    if (response.session_path) {
+      setSessionPath(response.session_path);
+    }
+  }, [threadId]);
 
   useEffect(() => {
     let disposed = false;
@@ -175,7 +178,7 @@ export function useDeepAgentSession() {
   }, [clearSocketTimers, threadId]);
 
   useEffect(() => {
-    if (!sessionPath) {
+    if (!threadId) {
       return;
     }
 
@@ -190,7 +193,7 @@ export function useDeepAgentSession() {
     }, isRunning ? 2500 : 6000);
 
     return () => window.clearInterval(timer);
-  }, [isRunning, refreshFiles, sessionPath]);
+  }, [isRunning, refreshFiles, threadId]);
 
   const submitTask = useCallback(
     async (query: string) => {

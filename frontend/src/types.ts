@@ -43,6 +43,7 @@ export interface UploadResponse {
 export interface OutputFile {
   name: string;
   type: "file" | string;
+  /** 相对于当前会话 output/session_{thread_id} 的路径 */
   path: string;
   size: number;
   mtime: number;
@@ -50,6 +51,7 @@ export interface OutputFile {
 
 export interface FileListResponse {
   files?: OutputFile[];
+  session_path?: string;
   error?: string;
 }
 

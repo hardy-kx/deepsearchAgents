@@ -62,7 +62,7 @@ async def run_deep_agent(task_query, session_id):
     session_dir = project_root_path / "output" / f"session_{session_id}"
     session_dir.mkdir(parents=True, exist_ok=True)
 
-    # 前端和工具使用绝对路径；提示词里只给模型相对路径，降低模型误用系统绝对路径的概率
+    # 工具层使用绝对路径读写；推送给前端和提示词则用相对路径，避免本机绝对路径泄漏
     session_dir_str = str(session_dir).replace("\\", "/")
     relative_session_dir_str = str(session_dir.relative_to(project_root_path)).replace(
         "\\", "/"
@@ -90,8 +90,8 @@ async def run_deep_agent(task_query, session_id):
     session_dir_token = set_session_context(session_dir_str)
     session_id_token = set_thread_context(session_id)
 
-    # 前端拿到工作目录后，可以展示本次任务生成的 Markdown/PDF 等产物
-    monitor.report_session_dir(session_dir_str)
+    # 前端只展示相对工作目录；文件列表/下载统一走 thread_id，不依赖本机绝对路径
+    monitor.report_session_dir(relative_session_dir_str)
 
     # WebSocket / 文件目录仍用 session_id；checkpointer 每次任务用独立 thread_id，
     # 避免上一轮残留的未闭合 tool_calls 被 DashScope/Qwen 拒绝（400 invalid_parameter）
