@@ -9,7 +9,7 @@ import {
   ToolOutlined
 } from "@ant-design/icons";
 import { Alert, App as AntApp, Button } from "antd";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ChatComposer } from "./components/ChatComposer";
 import { ConversationThread } from "./components/ConversationThread";
 import type { ChatTurn } from "./components/ConversationThread";
@@ -44,7 +44,6 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [stagedItems, setStagedItems] = useState<UploadedItem[]>([]);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
-  const streamRef = useRef<HTMLElement | null>(null);
   const session = useDeepAgentSession();
 
   useEffect(() => {
@@ -65,20 +64,6 @@ export default function App() {
       return [...previous.slice(0, -1), nextLatestTurn];
     });
   }, [session.events, session.files, session.isRunning, session.result]);
-
-  useEffect(() => {
-    const streamNode = streamRef.current;
-    if (!streamNode) {
-      return;
-    }
-
-    window.requestAnimationFrame(() => {
-      streamNode.scrollTo({
-        top: streamNode.scrollHeight,
-        behavior: "smooth"
-      });
-    });
-  }, [turns]);
 
   async function handleSubmit() {
     const cleanQuery = query.trim();
@@ -227,7 +212,7 @@ export default function App() {
           />
         ) : null}
 
-        <section className="chat-stream-panel" ref={streamRef}>
+        <section className="chat-stream-panel">
           <ConversationThread
             onUseExample={setQuery}
             threadId={session.threadId}

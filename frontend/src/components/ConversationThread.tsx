@@ -14,7 +14,7 @@ import {
   ToolOutlined,
 } from "@ant-design/icons";
 import { Button, Tooltip } from "antd";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { getDownloadUrl } from "../lib/api";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import type { MonitorMessage, OutputFile } from "../types";
@@ -177,19 +177,6 @@ function FileIcon({ name }: { name: string }) {
 }
 
 function ThinkingTimeline({ events }: { events: MonitorMessage[] }) {
-  const timelineRef = useRef<HTMLOListElement | null>(null);
-
-  useEffect(() => {
-    const timelineNode = timelineRef.current;
-    if (!timelineNode) {
-      return;
-    }
-
-    window.requestAnimationFrame(() => {
-      timelineNode.scrollTop = timelineNode.scrollHeight;
-    });
-  }, [events.length]);
-
   if (events.length === 0) {
     return (
       <div className="thinking-empty">
@@ -200,7 +187,7 @@ function ThinkingTimeline({ events }: { events: MonitorMessage[] }) {
   }
 
   return (
-    <ol className="thinking-timeline" ref={timelineRef}>
+    <ol className="thinking-timeline">
       {events.map((event, index) => (
         <li
           className={`thinking-event thinking-event--${event.event}`}
