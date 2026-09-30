@@ -16,10 +16,11 @@
 
 **📢 说明**：本套实战项目已于 2026 年 5 月 17 日 更新完成，配套教程、章节分支和前后端代码均可对照学习。
 
-简化启动步骤如下：①为启动数据库 ②.为启动后端 ③.启动前端
-1.docker compose -f docker/docker-compose.yaml up -d  
-2.uv run uvicorn app.api.server:app --host 0.0.0.0 --port 8000 --reload
-3.cd frontend npm run dev
+简化启动步骤如下：①为启动数据库 ②.复制环境变量模板 ③.为启动后端 ④.启动前端
+1.docker compose -f docker/docker-compose.yaml up -d
+2.cp .env.example .env
+3.uv run uvicorn app.api.server:app --host 0.0.0.0 --port 8000 --reload
+4.cd frontend npm run dev
 
 如果你正在找一个适合学习 `DeepAgents`、`WebSocket`、`Tavily`、`RAGFlow` 和 AI Agent 工程开发的实战项目，「深度研搜」很可能是最适合你的项目。
 
